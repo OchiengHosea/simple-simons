@@ -4,13 +4,14 @@ import {useEffect, useState} from "react";
 
 export default function App() {
   const [flashLights, setFlashLights] = useState([0,1,2,3]);
-  const [gameStatus, setGameStatus] = useState("Waiting");
+  const [gameStatus, setGameStatus] = useState("");
   const [dialedLights, setDialedLights] = useState([]);
-  const [colorLights, setColorLights] = useState(["red", "blue", "green", "yellow"]);
+  const [colorLights, setColorLights] = useState(["red", "blue", "green", "brown"]);
   const [selectedLights, setSelectedLights] = useState([]);
   // for stage n, app does n flashes, and user should win n flashes in a row
   const [stage, setStage] = useState({index:1,flashes:3});
   const [flashes, setFlashes] = useState([]);
+  const [blinkingIndex, setBlinkingIndex] = useState(-1);
 
   const [scoreRecord, setScoreRecord] = useState([]); // index: {flashes}, {answer}, {score}
 
@@ -32,6 +33,7 @@ export default function App() {
   const restart = () => {
     setGameStatus("Playing");
     setDialedLights([]);
+    setFlashes([]);
     setStage({index:1, flashes: 3});
   }
 
@@ -39,8 +41,6 @@ export default function App() {
   const lightPressed = (light) => {
     // @ts-ignore
     setDialedLights([...dialedLights, light]);
-    // setStage({index:1, flashes: 3});
-    // console.log(dialedLights);
   }
 
   // @ts-ignore
@@ -52,32 +52,37 @@ export default function App() {
 
   // @ts-ignore
   const Light = ({onPress, index}) => (
-    <TouchableOpacity onPress={onPress} style={
-      {
-        backgroundColor: selectedLights[index],
-        height: 100,
-        width: 100,
-        borderRadius: 100,
-        margin: 10,
-        opacity: .5
-      }
-    } />
+    <TouchableOpacity onPress={onPress} style={[{
+      ...styles.light,
+      backgroundColor: selectedLights[index]},
+        index===blinkingIndex ? styles.blinked : styles.stayed]
+      } />
   );
 
   // @ts-ignore
   const computeScore = (dialedLights) => {
+    let dialMatched = true;
     for (let ind = 0; ind <= dialedLights.length; ind++){
       if (flashes[ind] != dialedLights[ind]) {
-        console.log("You loose!");
-        console.log("Dialed: ", dialedLights, "Flashes: ", flashes);
-        restart();
-        return;
+        dialMatched = false;
+        setGameStatus("You Lose!");
+        setTimeout(() => {
+          restart();
+          return;
+        }, 3000);
       }
     }
-    console.log("You win");
-    console.log("Dialed: ", dialedLights, "Flashes: ", flashes);
 
-    levelUp();
+    if (dialMatched && stage.index == 5){
+      setGameStatus("You Win!");
+      setTimeout(() => {
+        restart();
+        return
+      }, 2000)
+    } else if (dialMatched) {
+      levelUp();
+    }
+
   }
 
   const shuffleColors = (llgts:any) => {
@@ -90,6 +95,17 @@ export default function App() {
     setSelectedLights(llgts);
   }
 
+  // @ts-ignore
+  async function blink(ll) {
+    for(let i = 0; i <= ll.length -1; i++){
+      setBlinkingIndex(ll[i]);
+      await sleep(1000);
+    }
+    setBlinkingIndex(-1);
+  }
+
+  const sleep = (m: number) => new Promise((r) => setTimeout(r, m));
+
   const flash = () => {
     const flashesTmp = [];
     for (let index = 0; index <= stage.flashes-1; index++){
@@ -98,8 +114,7 @@ export default function App() {
     // @ts-ignore
     setFlashes(flashesTmp);
 
-    // set opacities to .9
-    console.log("Expected: ", flashesTmp);
+    blink(flashesTmp);
 
   }
 
@@ -129,12 +144,17 @@ export default function App() {
       <StatusBar style="auto" />
       <Text style={{fontWeight:"bold", fontSize: 20}}>Game of Simons</Text>
 
+      <Text>Wind 5 in row</Text>
+
+      <Text>{gameStatus}</Text>
+
+      <Text>Level : {stage.index},  {stage.flashes} clicks</Text>
       <View style={styles.lightsContainer}>
         {selectedLights.length > 0 ? flashLights.map((l,i) => <Light key={i} index={i} onPress={() => lightPressed(l)}/>) : null}
       </View>
 
       <View style={{marginTop: 50}}>
-        <AppButton onPress={restart} title={"Start"}/>
+        <AppButton onPress={restart} title={gameStatus === "" ? "Start" : "Restart"}/>
       </View>
 
     </View>
@@ -157,6 +177,16 @@ const styles = StyleSheet.create({
 
   },
 
+  blinked: {
+    opacity: .8,
+    elevation: 8,
+  },
+
+  stayed: {
+    opacity: .5,
+    elevation: 0
+  },
+
   lightsContainer: {
     flex: .5,
     justifyContent: "center",
@@ -166,11 +196,11 @@ const styles = StyleSheet.create({
   },
 
   light:{
-    backgroundColor: "#c6c2c2",
     height: 100,
     width: 100,
     borderRadius: 100,
     margin: 10,
+    opacity: .5
   },
 
   appButtonContainer: {
